@@ -1,0 +1,37 @@
+---
+- name: Configura un Docker Registry privato su macOS
+  hosts: localhost 
+  become: no # become è un comando che da o meno i permessi di root
+
+  vars:
+    registry_port: 5000
+    registry_data_dir: /Users/Shared/docker-registry-data 
+
+  tasks:
+
+    - name: Verifica Docker
+      ansible.builtin.command: docker info
+      register: docker_status
+      changed_when: false
+      failed_when: docker_status.rc != 0
+      
+    - name: Crea la directory per i dati persistenti del registro
+      ansible.builtin.file:
+        path: "{{ registry_data_dir }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user_id }}" # Imposta all'utente specificato nell'inventory (nel mio caso localhost)
+        group: staff
+
+    - name: Avvia il container Docker Registry
+      community.docker.docker_container:
+        name: registry
+        image: registry:2
+        state: started
+        restart_policy: always
+        ports:
+          - "{{ registry_port }}:5000"
+        volumes:
+          - "{{ registry_data_dir }}:/var/lib/registry"
+        env:
+          REGISTRY_STORAGE_DELETE_ENABLED: "true"
