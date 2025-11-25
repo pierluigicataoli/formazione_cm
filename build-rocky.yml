@@ -1,0 +1,96 @@
+---
+- name: Build Rocky Linux SSH Container
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    container_name: rocky-ssh
+    container_image: rockylinux:9
+    ssh_user: ansible
+    ssh_port: 2227
+    
+  tasks:
+    - name: Crea directory per Dockerfile Rocky
+      file:
+        path: ./rocky-container
+        state: directory
+        mode: '0755'
+    
+    - name: Genera coppia di chiavi SSH se non esiste
+      openssh_keypair:
+        path: ./rocky-container/id_rsa
+        type: rsa
+        size: 4096
+        force: false
+      register: ssh_key
+    
+    - name: Crea Dockerfile per Rocky Linux
+      copy:
+        dest: ./rocky-container/Dockerfile
+        content: |
+          FROM rockylinux:9
+          
+          # Installa SSH e sudo
+          RUN dnf install -y openssh-server sudo && \
+              dnf clean all
+          
+          # Crea utente ansible
+          RUN useradd -m -s /bin/bash {{ ssh_user }} && \
+              echo "{{ ssh_user }} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/{{ ssh_user }} && \
+              chmod 0440 /etc/sudoers.d/{{ ssh_user }}
+          
+          # Configura SSH
+          RUN mkdir -p /home/{{ ssh_user }}/.ssh && \
+              chmod 700 /home/{{ ssh_user }}/.ssh && \
+              ssh-keygen -A && \
+              sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
+              sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+          
+          # Copia la chiave pubblica
+          COPY id_rsa.pub /home/{{ ssh_user }}/.ssh/authorized_keys
+          
+          RUN chown -R {{ ssh_user }}:{{ ssh_user }} /home/{{ ssh_user }}/.ssh && \
+              chmod 600 /home/{{ ssh_user }}/.ssh/authorized_keys
+          
+          EXPOSE 22
+          
+          CMD ["/usr/sbin/sshd", "-D"]
+    
+    - name: Copia chiave pubblica nella directory di build
+      copy:
+        src: ./rocky-container/id_rsa.pub
+        dest: ./rocky-container/id_rsa.pub
+        mode: '0644'
+    
+    - name: Build Docker image Rocky Linux
+      community.docker.docker_image:
+        name: "{{ container_name }}"
+        build:
+          path: ./rocky-container
+        source: build
+        state: present
+        force_source: true
+    
+    - name: Stop container esistente se presente
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        state: absent
+      ignore_errors: true
+    
+    - name: Avvia container Rocky Linux con SSH
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        image: "{{ container_name }}"
+        state: started
+        restart_policy: always
+        ports:
+          - "{{ ssh_port }}:22"
+    
+    - name: Mostra informazioni di connessione
+      debug:
+        msg:
+          - "Container Rocky Linux SSH avviato con successo!"
+          - "Per connetterti usa - ssh -i ./rocky-container/id_rsa -p {{ ssh_port }} {{ ssh_user }}@localhost"
+          - "Chiave privata - ./rocky-container/id_rsa"

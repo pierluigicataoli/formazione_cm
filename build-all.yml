@@ -1,0 +1,33 @@
+---
+- name: Build Ubuntu SSH Container
+  import_playbook: build-ubuntu.yml
+
+- name: Build Rocky Linux SSH Container
+  import_playbook: build-rocky.yml
+
+- name: Mostra riepilogo finale
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  
+  tasks:
+    - name: Verifica container in esecuzione
+      community.docker.docker_container_info:
+        name: "{{ item }}"
+      loop:
+        - ubuntu-ssh
+        - rocky-ssh
+      register: containers_info
+    
+    - name: Mostra riepilogo
+      debug:
+        msg:
+          - "=== RIEPILOGO CONTAINER SSH ==="
+          - ""
+          - "Container Ubuntu SSH:"
+          - "  ssh -i ./ubuntu-container/id_rsa -p 2226 ansible@localhost"
+          - ""
+          - "Container Rocky Linux SSH:"
+          - "  ssh -i ./rocky-container/id_rsa -p 2227 ansible@localhost"
+          - ""
+          - "Per testare sudo: ssh ... 'sudo whoami'"
