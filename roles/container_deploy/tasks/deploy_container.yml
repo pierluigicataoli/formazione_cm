@@ -13,6 +13,22 @@
   ignore_errors: true
   when: container_runtime == 'podman'
 
+- name: "Login al Registry Docker per il Pull (Vault)"
+  community.docker.docker_login:
+    registry_url: "{{ registry_host }}:{{ registry_port }}"
+    username: "{{ registry_username }}" # Preso dal Vault
+    password: "{{ registry_password }}" # Preso dal Vault
+    state: present
+  when: container_runtime == 'docker'
+
+- name: "Login al Registry Podman per il Pull (Vault)"
+  containers.podman.podman_login:
+    registry: "{{ registry_host }}:{{ registry_port }}"
+    username: "{{ registry_username }}" # Preso dal Vault
+    password: "{{ registry_password }}" # Preso dal Vault
+    state: present
+  when: container_runtime == 'podman'
+
 - name: "Pull immagine dal registry {{ container.name }} (Docker)"
   community.docker.docker_image:
     name: "{{ registry_host }}:{{ registry_port }}/{{ container.name }}"

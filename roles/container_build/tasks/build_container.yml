@@ -71,6 +71,26 @@
     - container_runtime == 'podman'
     - registry_push
 
+- name: "Login al Registry Docker con credenziali Vault"
+  community.docker.docker_login:
+    registry_url: "{{ registry_host }}:{{ registry_port }}"
+    username: "{{ registry_username }}" # Preso dal Vault
+    password: "{{ registry_password }}" # Preso dal Vault
+    state: present
+  when:
+    - registry_push # Esegui solo se è richiesto un push
+    - container_runtime == 'docker'
+
+- name: "Login al Registry Podman con credenziali Vault"
+  containers.podman.podman_login:
+    registry: "{{ registry_host }}:{{ registry_port }}"
+    username: "{{ registry_username }}" # Preso dal Vault
+    password: "{{ registry_password }}" # Preso dal Vault
+    state: present
+  when:
+    - registry_push # Esegui solo se è richiesto un push
+    - container_runtime == 'podman'
+
 - name: "Push immagine a registry {{ container.name }} (Docker)"
   community.docker.docker_image:
     name: "{{ registry_host }}:{{ registry_port }}/{{ container.name }}"
