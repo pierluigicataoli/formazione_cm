@@ -1,0 +1,65 @@
+---
+- name: "Stop container esistente {{ container.name }} (Docker)"
+  community.docker.docker_container:
+    name: "{{ container.name }}"
+    state: absent
+  ignore_errors: true
+  when: container_runtime == 'docker'
+
+- name: "Stop container esistente {{ container.name }} (Podman)"
+  containers.podman.podman_container:
+    name: "{{ container.name }}"
+    state: absent
+  ignore_errors: true
+  when: container_runtime == 'podman'
+
+- name: "Pull immagine dal registry {{ container.name }} (Docker)"
+  community.docker.docker_image:
+    name: "{{ registry_host }}:{{ registry_port }}/{{ container.name }}"
+    tag: "{{ image_tag }}"
+    source: pull
+    state: present
+  when: container_runtime == 'docker'
+
+- name: "Pull immagine dal registry {{ container.name }} (Podman)"
+  containers.podman.podman_image:
+    name: "{{ registry_host }}:{{ registry_port }}/{{ container.name }}:{{ image_tag }}"
+    state: present
+  when: container_runtime == 'podman'
+
+- name: "Avvia container {{ container.name }} (Docker)"
+  community.docker.docker_container:
+    name: "{{ container.name }}"
+    image: "{{ registry_host }}:{{ registry_port }}/{{ container.name }}:{{ image_tag }}"
+    state: started
+    restart_policy: "{{ restart_policy }}"
+    network_mode: "{{ network_mode }}"
+    ports:
+      - "{{ container.ssh_port }}:22"
+      - "{{ container.app_port }}:{{ container.app_port }}"
+  when: container_runtime == 'docker'
+
+- name: "Avvia container {{ container.name }} (Podman)"
+  containers.podman.podman_container:
+    name: "{{ container.name }}"
+    image: "{{ registry_host }}:{{ registry_port }}/{{ container.name }}:{{ image_tag }}"
+    state: started
+    restart_policy: "{{ restart_policy }}"
+    network: "{{ network_mode }}"
+    ports:
+      - "{{ container.ssh_port }}:22"
+      - "{{ container.app_port }}:{{ container.app_port }}"
+  when: container_runtime == 'podman'
+
+- name: "Attendi che SSH sia pronto su {{ container.name }}"
+  wait_for:
+    host: localhost
+    port: "{{ container.ssh_port }}"
+    delay: 2
+    timeout: 30
+
+- name: "Mostra informazioni deploy {{ container.name }}"
+  debug:
+    msg:
+      - "Container {{ container.name }} avviato"
+      - "SSH: ssh -i {{ build_dir }}/{{ container.name }}/id_rsa -p {{ container.ssh_port }} {{ container.ssh_user }}@localhost"

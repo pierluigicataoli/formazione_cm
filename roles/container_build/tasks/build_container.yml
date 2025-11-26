@@ -1,0 +1,100 @@
+---
+- name: "Crea directory per {{ container.name }}"
+  file:
+    path: "{{ build_dir }}/{{ container.name }}"
+    state: directory
+    mode: '0755'
+
+- name: "Genera coppia di chiavi SSH per {{ container.name }}"
+  openssh_keypair:
+    path: "{{ build_dir }}/{{ container.name }}/id_rsa"
+    type: rsa
+    size: "{{ ssh_key_size }}"
+    force: false
+
+- name: "Crea Dockerfile per {{ container.name }}"
+  template:
+    src: Dockerfile.j2
+    dest: "{{ build_dir }}/{{ container.name }}/Dockerfile"
+    mode: '0644'
+
+- name: "Crea script di avvio per {{ container.name }}"
+  template:
+    src: start.sh.j2
+    dest: "{{ build_dir }}/{{ container.name }}/start.sh"
+    mode: '0755'
+
+- name: "Copia chiave pubblica per {{ container.name }}"
+  copy:
+    src: "{{ build_dir }}/{{ container.name }}/id_rsa.pub"
+    dest: "{{ build_dir }}/{{ container.name }}/id_rsa.pub"
+    mode: '0644'
+
+- name: "Build immagine {{ container.name }} (Docker)"
+  community.docker.docker_image:
+    name: "{{ container.name }}"
+    build:
+      path: "{{ build_dir }}/{{ container.name }}"
+    source: build
+    state: present
+    force_source: true
+    tag: "{{ image_tag }}"
+  when: container_runtime == 'docker'
+
+- name: "Build immagine {{ container.name }} (Podman)"
+  containers.podman.podman_image:
+    name: "{{ container.name }}"
+    path: "{{ build_dir }}/{{ container.name }}"
+    build:
+      format: docker
+    state: present
+    force: true
+    tag: "{{ image_tag }}"
+  when: container_runtime == 'podman'
+
+- name: "Tag immagine per registry {{ container.name }} (Docker)"
+  community.docker.docker_image:
+    name: "{{ container.name }}:{{ image_tag }}"
+    repository: "{{ registry_host }}:{{ registry_port }}/{{ container.name }}:{{ image_tag }}"
+    source: local
+    force_tag: true
+  when: 
+    - container_runtime == 'docker'
+    - registry_push
+
+- name: "Tag immagine per registry {{ container.name }} (Podman)"
+  containers.podman.podman_tag:
+    image: "{{ container.name }}:{{ image_tag }}"
+    target_names:
+      - "{{ registry_host }}:{{ registry_port }}/{{ container.name }}:{{ image_tag }}"
+  when: 
+    - container_runtime == 'podman'
+    - registry_push
+
+- name: "Push immagine a registry {{ container.name }} (Docker)"
+  community.docker.docker_image:
+    name: "{{ registry_host }}:{{ registry_port }}/{{ container.name }}"
+    tag: "{{ image_tag }}"
+    push: yes
+    source: local
+  when: 
+    - container_runtime == 'docker'
+    - registry_push
+
+- name: "Push immagine a registry {{ container.name }} (Podman)"
+  containers.podman.podman_image:
+    name: "{{ registry_host }}:{{ registry_port }}/{{ container.name }}:{{ image_tag }}"
+    push: yes
+    push_args:
+      dest: "{{ registry_host }}:{{ registry_port }}"
+  when: 
+    - container_runtime == 'podman'
+    - registry_push
+
+- name: "Mostra informazioni build {{ container.name }}"
+  debug:
+    msg:
+      - "Build completata: {{ container.name }}"
+      - "Immagine: {{ registry_host }}:{{ registry_port }}/{{ container.name }}:{{ image_tag }}"
+      - "SSH Key: {{ build_dir }}/{{ container.name }}/id_rsa"
+

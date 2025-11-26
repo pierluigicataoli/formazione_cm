@@ -1,0 +1,106 @@
+FROM {{ container.base_image }}
+
+{% if container.package_manager == 'apk' %}
+# Installa pacchetti Alpine
+RUN apk add --no-cache {% for pkg in container.packages %}{{ pkg }} {% endfor %}
+
+# Crea utente {{ container.ssh_user }}
+RUN adduser -D -s /bin/sh {{ container.ssh_user }} && \
+    echo "{{ container.ssh_user }} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/{{ container.ssh_user }} && \
+    chmod 0440 /etc/sudoers.d/{{ container.ssh_user }}
+
+# Configura SSH
+RUN mkdir -p /home/{{ container.ssh_user }}/.ssh && \
+    chmod 700 /home/{{ container.ssh_user }}/.ssh && \
+    ssh-keygen -A && \
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
+    sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+
+# Copia la chiave pubblica
+COPY id_rsa.pub /home/{{ container.ssh_user }}/.ssh/authorized_keys
+
+RUN chown -R {{ container.ssh_user }}:{{ container.ssh_user }} /home/{{ container.ssh_user }}/.ssh && \
+    chmod 600 /home/{{ container.ssh_user }}/.ssh/authorized_keys
+
+# Esponi porte
+EXPOSE 22
+{% if container.app_port is defined %}
+EXPOSE {{ container.app_port }}
+{% endif %}
+
+# Avvia SSH
+CMD ["/usr/sbin/sshd", "-D"]
+
+
+{% elif container.package_manager == 'apt' %}
+# Installa pacchetti Debian/Ubuntu
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    {% for pkg in container.packages %}{{ pkg }} {% endfor %} \
+    && rm -rf /var/lib/apt/lists/*
+
+# Crea utente {{ container.ssh_user }} e setup sudo
+RUN useradd -ms /bin/bash {{ container.ssh_user }} && \
+    echo "{{ container.ssh_user }} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/{{ container.ssh_user }} && \
+    chmod 0440 /etc/sudoers.d/{{ container.ssh_user }}
+
+# Configura SSH e directory
+RUN mkdir -p /home/{{ container.ssh_user }}/.ssh && \
+    chmod 700 /home/{{ container.ssh_user }}/.ssh && \
+    ssh-keygen -A && \
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
+    sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+
+# Copia la chiave pubblica
+COPY id_rsa.pub /home/{{ container.ssh_user }}/.ssh/authorized_keys
+
+RUN chown -R {{ container.ssh_user }}:{{ container.ssh_user }} /home/{{ container.ssh_user }}/.ssh && \
+    chmod 600 /home/{{ container.ssh_user }}/.ssh/authorized_keys
+
+COPY start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+
+# Esponi porte
+EXPOSE 22
+{% if container.app_port is defined %}
+EXPOSE {{ container.app_port }}
+{% endif %}
+
+# Avvia SSH in foreground
+CMD ["/usr/local/bin/start.sh"]
+
+{% elif container.package_manager == 'dnf' %}
+# Installa pacchetti RHEL/Rocky
+RUN dnf install -y --allowerasing \
+    openssh-server \
+    sudo \
+    python3 \
+    curl \
+    httpd \
+    && dnf clean all # Crea utente {{ container.ssh_user }} e setup sudo
+RUN useradd -m -s /bin/bash {{ container.ssh_user }} && \
+    echo "{{ container.ssh_user }} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/{{ container.ssh_user }} && \
+    chmod 0440 /etc/sudoers.d/{{ container.ssh_user }}
+
+# Configura SSH e directory
+RUN mkdir -p /home/{{ container.ssh_user }}/.ssh && \
+    chmod 700 /home/{{ container.ssh_user }}/.ssh && \
+    ssh-keygen -A && \
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
+    sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+    
+# Copia la chiave pubblica
+COPY id_rsa.pub /home/{{ container.ssh_user }}/.ssh/authorized_keys
+
+RUN chown -R {{ container.ssh_user }}:{{ container.ssh_user }} /home/{{ container.ssh_user }}/.ssh && \
+    chmod 600 /home/{{ container.ssh_user }}/.ssh/authorized_keys
+
+# Esponi porte
+EXPOSE 22
+{% if container.app_port is defined %}
+EXPOSE {{ container.app_port }}
+{% endif %}
+
+# Avvia SSH in foreground
+CMD ["/usr/sbin/sshd", "-D"]
+{% endif %}
+

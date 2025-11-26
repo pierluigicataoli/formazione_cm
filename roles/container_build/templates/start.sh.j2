@@ -1,0 +1,31 @@
+#!/bin/bash
+set -e
+
+# Crea directory necessarie per SSH se non esistono
+mkdir -p /run/sshd
+mkdir -p /var/run/sshd
+
+# Genera le chiavi host SSH se non esistono
+{% if container.package_manager == 'apt' %}
+if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
+    ssh-keygen -A
+fi
+{% elif container.package_manager in ['dnf', 'apk'] %}
+if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
+    ssh-keygen -A
+fi
+{% endif %}
+
+# Verifica che le chiavi SSH dell'utente siano configurate correttamente
+if [ -f /home/{{ container.ssh_user }}/.ssh/authorized_keys ]; then
+    chown {{ container.ssh_user }}:{{ container.ssh_user }} /home/{{ container.ssh_user }}/.ssh/authorized_keys
+    chmod 600 /home/{{ container.ssh_user }}/.ssh/authorized_keys
+fi
+
+# Log di avvio
+echo "Starting SSH daemon..."
+echo "SSH User: {{ container.ssh_user }}"
+echo "SSH Port: 22"
+
+# Avvia SSH in foreground
+exec /usr/sbin/sshd -D -e

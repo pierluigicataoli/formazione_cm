@@ -1,0 +1,14 @@
+---
+- name: Deploy con Docker
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  
+  vars:
+    container_runtime: docker
+    ansible_python_interpreter: /usr/bin/python3
+  
+  roles:
+    - container_registry
+    - container_build
+    - container_deploy

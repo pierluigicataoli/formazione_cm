@@ -1,0 +1,72 @@
+---
+- name: Deploy completo con Registry, Build e Run
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  
+  vars:
+    # Scegli il runtime: 'docker' o 'podman'
+    container_runtime: docker
+    
+    # Configurazione registry
+    registry_port: 6000
+
+    registry_host: "127.0.0.1"
+    
+    # Configurazione container
+    containers:
+      - name: ubuntu-ssh
+        base_image: ubuntu:22.04
+        ssh_port: 2226
+        app_port: 8085
+        ssh_user: ansible
+        package_manager: apt
+        packages:
+          - openssh-server
+          - sudo
+          - python3
+          - curl
+          - nginx
+      
+      - name: rocky-ssh
+        base_image: rockylinux:9
+        ssh_port: 2227
+        app_port: 8086
+        ssh_user: ansible
+        package_manager: dnf
+        packages:
+          - openssh-server
+          - sudo
+          - python3
+          - curl
+          - httpd
+      
+      - name: alpine-ssh
+        base_image: alpine:3.19
+        ssh_port: 2228
+        app_port: 8087
+        ssh_user: ansible
+        package_manager: apk
+        packages:
+          - openssh-server
+          - sudo
+          - python3
+          - curl
+  
+  roles:
+    - role: container_registry
+      vars:
+        registry_name: local-registry
+        registry_port: "6000"
+        container_runtime: "docker"
+    
+    - role: container_build
+      vars:
+        registry_port: "6000"
+        container_runtime: "docker"
+        registry_push: true
+    
+    - role: container_deploy
+      vars:
+        registry_port: "6000"
+        container_runtime: "docker"

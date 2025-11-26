@@ -1,0 +1,40 @@
+---
+- name: Verifica che il registry sia raggiungibile
+  wait_for:
+    host: "{{ registry_host }}"
+    port: "{{ registry_port }}"
+    timeout: 10
+  ignore_errors: yes
+
+- name: Processa ogni container per il deploy
+  include_tasks: deploy_container.yml
+  loop: "{{ containers }}"
+  loop_control:
+    loop_var: container
+
+- name: Verifica container in esecuzione (Docker)
+  community.docker.docker_container_info:
+    name: "{{ item.name }}"
+  loop: "{{ containers }}"
+  register: docker_containers_info
+  when: container_runtime == 'docker'
+
+- name: Verifica container in esecuzione (Podman)
+  containers.podman.podman_container_info:
+    name: "{{ item.name }}"
+  loop: "{{ containers }}"
+  register: podman_containers_info
+  when: container_runtime == 'podman'
+
+- name: Mostra riepilogo deploy
+  debug:
+    msg: |
+      === DEPLOY COMPLETATO ===
+      Runtime: {{ container_runtime }}
+      
+      Container in esecuzione:
+      {% for c in containers %}
+        {{ c.name }}:
+          SSH: ssh -i {{ build_dir }}/{{ c.name }}/id_rsa -p {{ c.ssh_port }} {{ c.ssh_user }}@localhost
+          App Port: {{ c.app_port }}
+      {% endfor %}

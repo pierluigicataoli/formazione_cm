@@ -1,0 +1,20 @@
+---
+- name: Crea directory principale per i build
+  file:
+    path: "{{ build_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Processa ogni container
+  include_tasks: build_container.yml
+  loop: "{{ containers }}"
+  loop_control:
+    loop_var: container
+
+- name: Mostra riepilogo build
+  debug:
+    msg:
+      - "=== BUILD COMPLETATE ==="
+      - "Runtime: {{ container_runtime }}"
+      - "Registry: {{ registry_host }}:{{ registry_port }}"
+      - "Immagini buildati: {{ containers | map(attribute='name') | list | join(', ') }}"

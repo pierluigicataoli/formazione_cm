@@ -1,0 +1,41 @@
+---
+# Container runtime
+container_runtime: docker
+
+# Configurazione build
+build_dir: ./builds
+ssh_key_size: 4096
+
+# Lista dei container da buildare
+containers:
+  - name: ubuntu-ssh
+    base_image: ubuntu:22.04
+    ssh_port: 2226
+    app_port: 8080
+    ssh_user: ansible
+    package_manager: apt
+    packages:
+      - openssh-server
+      - sudo
+      - python3
+      - curl
+    
+  - name: rocky-ssh
+    base_image: rockylinux:9
+    ssh_port: 2227
+    app_port: 8081
+    ssh_user: ansible
+    package_manager: dnf
+    packages:
+      - openssh-server
+      - sudo
+      - python3
+      - curl
+
+# Registry di destinazione
+registry_host: localhost
+registry_port: 6000
+registry_push: true
+
+# Tag delle immagini
+image_tag: latest

@@ -1,0 +1,87 @@
+---
+- name: Determina il modulo da utilizzare
+  set_fact:
+    container_module: "{{ 'containers.podman.podman_container' if container_runtime == 'podman' else 'community.docker.docker_container' }}"
+    volume_module: "{{ 'containers.podman.podman_volume' if container_runtime == 'podman' else 'community.docker.docker_volume' }}"
+
+- name: Crea volume per il registry
+  community.docker.docker_volume:
+    name: "{{ registry_volume }}"
+    docker_host: unix://var/run/docker.sock
+    state: present
+  when: container_runtime == 'docker'
+
+- name: Crea volume per il registry (Podman)
+  containers.podman.podman_volume:
+    name: "{{ registry_volume }}"
+    state: present
+  when: container_runtime == 'podman'
+
+- name: Stop registry esistente se presente
+  community.docker.docker_container:
+    name: "{{ registry_name }}"
+    state: absent
+  ignore_errors: true
+  when: container_runtime == 'docker'
+
+- name: Stop registry esistente se presente (Podman)
+  containers.podman.podman_container:
+    name: "{{ registry_name }}"
+    state: absent
+  ignore_errors: true
+  when: container_runtime == 'podman'
+
+- name: Avvia container registry (Docker)
+  community.docker.docker_container:
+    name: "{{ registry_name }}"
+    image: "{{ registry_image }}"
+    docker_host: unix://var/run/docker.sock
+    state: started
+    restart_policy: always
+    ports:
+      - "{{ registry_port }}:5000"
+    volumes:
+      - "{{ registry_volume }}:/var/lib/registry"
+    env:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+  when: container_runtime == 'docker'
+
+- name: Avvia container registry (Podman)
+  containers.podman.podman_container:
+    name: "{{ registry_name }}"
+    image: "{{ registry_image }}"
+    state: started
+    restart_policy: always
+    ports:
+      - "{{ registry_port }}:5000"
+    volume:
+      - "{{ registry_volume }}:/var/lib/registry"
+    env:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+  when: container_runtime == 'podman'
+
+- name: Attendi che il registry sia pronto
+  wait_for:
+    host: localhost
+    port: "{{ registry_port }}"
+    delay: 2
+    timeout: 30
+
+- name: Configura insecure registry per Docker
+  lineinfile:
+    path: /etc/docker/daemon.json
+    line: '{"insecure-registries": ["localhost:{{ registry_port }}"]}'
+    create: yes
+  when: 
+    - container_runtime == 'docker'
+    - not registry_tls_enabled
+  notify: restart docker
+  become: yes
+  ignore_errors: yes
+
+- name: Mostra informazioni registry
+  debug:
+    msg:
+      - "Registry avviato con successo!"
+      - "URL: localhost:{{ registry_port }}"
+      - "Runtime: {{ container_runtime }}"

@@ -1,0 +1,19 @@
+---
+# Container runtime (docker o podman)
+container_runtime: docker
+
+# Configurazione registry
+registry_name: local-registry
+registry_port: 6000
+registry_volume: registry-data
+registry_image: registry:2
+
+# Credenziali registry (opzionali)
+registry_auth_enabled: false
+registry_username: admin
+registry_password: password
+
+# Configurazione TLS (opzionali)
+registry_tls_enabled: false
+registry_cert_path: ""
+registry_key_path: ""

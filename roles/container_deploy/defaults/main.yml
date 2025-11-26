@@ -1,0 +1,29 @@
+---
+# Container runtime
+container_runtime: docker
+
+# Registry di origine
+registry_host: localhost
+registry_port: 6000
+
+# Configurazione deploy
+restart_policy: always
+network_mode: bridge
+
+# Lista dei container da deployare
+containers:
+  - name: ubuntu-ssh
+    ssh_port: 2226
+    app_port: 8080
+    ssh_user: ansible
+    
+  - name: rocky-ssh
+    ssh_port: 2227
+    app_port: 8081
+    ssh_user: ansible
+
+# Tag delle immagini
+image_tag: latest
+
+# Directory delle chiavi SSH
+build_dir: ./builds
