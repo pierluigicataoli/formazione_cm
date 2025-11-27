@@ -1,5 +1,7 @@
 pipeline {
-    agent any
+    agent {
+        label 'jenkins-agent-02'
+    }
     
     environment {
         REGISTRY_URL = '192.168.56.1:5000'
