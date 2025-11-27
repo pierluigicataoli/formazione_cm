@@ -14,11 +14,13 @@ containers:
     app_port: 8080
     ssh_user: ansible
     package_manager: apt
+    install_docker_client: true
     packages:
       - openssh-server
       - sudo
       - python3
       - curl
+      - docker.io
     
   - name: rocky-ssh
     base_image: rockylinux:9
@@ -31,6 +33,7 @@ containers:
       - sudo
       - python3
       - curl
+    install_docker_client: false
 
 # Registry di destinazione
 registry_host: localhost
