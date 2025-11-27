@@ -44,15 +44,6 @@ pipeline {
             }
         }
     }
-        stage('Debug') {
-    steps {
-        sh '''
-            pwd
-            ls -la
-            find . -name Dockerfile
-        '''
-    }
-}
     
     post {
         success {
