@@ -10,14 +10,6 @@ pipeline {
     }
     
     stages {
-        stage('checkout') {
-            steps {
-                    git branch: 'main' , url: 'https://github.com/pierluigicataoli/formazione_cm.git'
-            }
-        }
-
-
-
         stage('Build') {
             steps {
                 script {
@@ -52,6 +44,15 @@ pipeline {
             }
         }
     }
+        stage('Debug') {
+    steps {
+        sh '''
+            pwd
+            ls -la
+            find . -name Dockerfile
+        '''
+    }
+}
     
     post {
         success {
